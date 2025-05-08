@@ -107,11 +107,16 @@ log_info "${BLUE}What is the sudo version?${NC}"
 sudo -V
 
 log_info "${BLUE}Any GTFOBins?${NC}"
-while IFS= read -r bin; do
-  if grep -q "$bin" installed_packages.txt; then
-    log_success "Check GTFO for: $bin"
-  fi
-done < gtfobins.txt
+if [[ -f gtfobins.txt ]]; then
+  while IFS= read -r bin; do
+    if grep -q "$bin" installed_packages.txt; then
+      log_success "Check GTFO for: $bin"
+    fi
+  done < gtfobins.txt
+else
+  log_error "${RED}GTFOBins not found!${NC}"
+  log_info "Generate with 'curl -s https://gtfobins.github.io/ | html2text | col -bx | cut -d" " -f1 | sed '/^[[:space:]]*$/d' > gtfobins.txt'"
+fi
 
 log_info "${BLUE}Any readable config files${NC}"
 for l in $(echo ".conf .config .cnf .xml .bak");do echo -e "\nFile extension: " $l; find / -readable -name *$l 2>/dev/null | grep -v "lib\|fonts\|share\|core"; done
