@@ -1,0 +1,27 @@
+#!/bin/bash
+
+set -euo pipefail
+
+path=$1
+ver=$2
+
+if [[ ! -d $path ]]; then
+  printf "directory '$path' does not exist! exiting"
+  exit 1
+fi
+
+case "$ver" in
+  2.27) IMAGE="ubuntu:18.04" ;;  # Bionic
+  2.31) IMAGE="ubuntu:20.04" ;;  # Focal
+  2.35) IMAGE="ubuntu:22.04" ;;  # Jammy
+  *) echo "Unsupported glibc version: $ver" >&2; exit 1 ;;
+esac
+
+container_name="glibc$ver"
+
+docker run -dit --name $container_name --rm -v $path:/mnt $IMAGE bash && \
+docker exec $container_name apt update && \
+docker exec $container_name apt install -y build-essential && \
+docker exec $container_name bash -c 'echo "got files $(ls -alh /mnt)"' && \
+docker exec $container_name bash -c 'cd /mnt && echo "building" && make' && \
+docker stop $container_name

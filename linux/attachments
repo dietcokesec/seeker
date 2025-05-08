@@ -57,6 +57,16 @@ fstab() {
 	fi
 }
 
+nfs() {
+  if [[ -f /etc/exports ]]; then
+    log_info "${BLUE}Anything good in '/etc/exports'? Looking for 'no_root_squash'${NC}"
+    cat /etc/exports
+
+    log_info "Looking for 'no_root_squash'"
+    cat /etc/export | grep no_root_squash
+  fi
+}
+
 drives
 fstab
 
@@ -103,8 +113,20 @@ while IFS= read -r bin; do
   fi
 done < gtfobins.txt
 
-log_info "${BLUE}Any readable confi files${NC}"
-for l in $(echo ".conf .config .cnf");do echo -e "\nFile extension: " $l; find / -readable -name *$l 2>/dev/null | grep -v "lib\|fonts\|share\|core" ;done
+log_info "${BLUE}Any readable config files${NC}"
+for l in $(echo ".conf .config .cnf .xml .bak");do echo -e "\nFile extension: " $l; find / -readable -name *$l 2>/dev/null | grep -v "lib\|fonts\|share\|core"; done
+
+log_info "${BLUE}Any readable code config files${NC}"
+find / ! -path "*/proc/*" -readable -name "*config*" -type f 2>/dev/null | grep -v "lib\|fonts\|share\|core"
 
 log_info "${BLUE}Any readable script${NC}"
 find / -type f -readable -name "*.sh" 2>/dev/null | grep -v "src\|snap\|share"
+
+log_info "${BLUE}SUID Binaries${NC}"
+find / -user root -perm -4000 -exec ls -ldb {} \; 2>/dev/null
+
+log_info "${BLUE}SGID Binaries ${NC}"
+find / -user root -perm -6000 -exec ls -ldb {} \; 2>/dev/null
+
+log_info "${BLUE}Binaries with Capabilities"
+find /usr/bin /usr/sbin /usr/local/bin /usr/local/sbin -type f -exec getcap {} \;
