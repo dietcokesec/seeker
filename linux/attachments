@@ -1,0 +1,110 @@
+#!/bin/bash
+
+set -uo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+trim_string() {
+    # Usage: trim_string "   example   string    "
+    # Source: https://github.com/dylanaraps/pure-bash-bible
+    : "${1#"${1%%[![:space:]]*}"}"
+    : "${_%"${_##*[![:space:]]}"}"
+    printf '%s\n' "$_"
+}
+
+log_success() {
+    printf "[+] %b\n" "$@"
+}
+
+log_error() {
+    printf "[-] %b\n" "$@"
+}
+
+log_info() {
+    printf "[*] %b\n" "$@"
+}
+
+command_not_avail() {
+  log_error "command '$1' not available."
+}
+
+drives() {
+	if [[ -x $(command -v lsblk) ]]; then
+		log_info "${BLUE}Any suspicious mounted drives?${NC}"
+    lsblk
+  else
+    command_not_avail "lsblk"
+	fi
+
+  if [[ -x $(command -v df) ]]; then
+    log_info "${BLUE}Any mounted file systems?${NC}"
+    df -h
+  else
+    command_not_avail "df"
+  fi
+}
+
+fstab() {
+	if [[ -f /etc/fstab ]]; then
+		log_info "${BLUE}Anything good in '/etc/fstab'?${NC}"
+		cat /etc/fstab
+
+    log_info "${BLUE}Any unmounted filesystems?${NC}"
+    cat /etc/fstab | grep -v "#" | column -t
+	fi
+}
+
+drives
+fstab
+
+if [[ -x $(command -v route) ]]; then
+  log_info "${BLUE}Checking the routing table${NC}"
+  route
+fi
+
+if [[ -x $(command -v arp) ]]; then
+  log_info "${BLUE}Checking other hosts in the network${NC}"
+  arp -a
+fi
+
+log_info "${BLUE}Users with a login shell${NC}"
+cat /etc/passwd | grep -E ".*sh$" | cut -f1 -d:
+
+log_info "${BLUE}Groups and members${NC}"
+cat /etc/group
+
+log_info "${BLUE}Hidden files that $USER can read${NC}"
+find / -type f -name ".*" -readable -exec ls -l {} \; 2>/dev/null | grep "$USER"
+
+log_info "${BLUE}Hidden directories that $USER can read${NC}"
+find / -type d -name ".*" -perm -u+x -readable 2>/dev/null | grep -v "lib\|fonts\|share\|core"
+
+log_info "${BLUE}Temporary files that $USER can read${NC}"
+find /tmp /var/tmp /dev/shm -readable -exec ls -ld {} \; 2>/dev/null | grep -v "lib\|fonts\|share\|core"
+
+log_info "${BLUE}History files that $USER can read${NC}"
+find / -type f \( -name *_hist -o -name *_history \) -readable -exec ls -l {} \; 2>/dev/null | grep -v "lib\|fonts\|share\|core"
+
+log_info "${BLUE}Any good installed packages?${NC}"
+apt list --installed | tr "/" " " | cut -d" " -f1,3 | sed 's/[0-9]://g' | tee -a installed_packages.txt
+# Remove the Loading... bullshit from the apt list
+tail -n +2 installed_packages.txt > temp && mv temp installed_packages.txt
+
+log_info "${BLUE}What is the sudo version?${NC}"
+sudo -V
+
+log_info "${BLUE}Any GTFOBins?${NC}"
+while IFS= read -r bin; do
+  if grep -q "$bin" installed_packages.txt; then
+    log_success "Check GTFO for: $bin"
+  fi
+done < gtfobins.txt
+
+log_info "${BLUE}Any readable confi files${NC}"
+for l in $(echo ".conf .config .cnf");do echo -e "\nFile extension: " $l; find / -readable -name *$l 2>/dev/null | grep -v "lib\|fonts\|share\|core" ;done
+
+log_info "${BLUE}Any readable script${NC}"
+find / -type f -readable -name "*.sh" 2>/dev/null | grep -v "src\|snap\|share"

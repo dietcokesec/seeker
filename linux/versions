@@ -1,0 +1,70 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# Colored logs
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+log_success() {
+    printf "[+] %b\n" "$@"
+}
+
+log_error() {
+    printf "[-] %b\n" "$@"
+}
+
+log_info() {
+    printf "[*] %b\n" "$@"
+}
+
+combined_version_string() {
+	log_info "Version String: $(uname -a)"
+}
+
+env_vars() {
+    env | grep -Ev '^(XDG_|QT_|GDM_|LS_COLORS|VTE_|GNOME_|DBUS_|LESS_TERMCAP_|MEMORY_PRESSURE_|SYSTEMD_|GPG_AGENT_INFO)' | \
+    while IFS='=' read -r key value; do
+        log_info "$key=\"$(echo "$value" | sed $'s/\x1B\\[[0-9;]*[JKmsu]//g')\""
+    done
+}
+
+shells() {
+	log_info "$(cat /etc/shells)"
+	log_info "Current Shell ${RED}$SHELL${NC}"
+}
+
+versions_linux() {
+	if [[ -f /etc/os-release ]]; then
+		log_info "Fetching from '/etc/os-release'"
+		grep -Ei '^(name|.*version.*|.*id.*|.*codename.*)' /etc/os-release | sed 's/"//g'
+	else
+		log_error "/etc/os-release not found"
+	fi
+
+	combined_version_string
+	env_vars
+	shells
+}
+
+versions_macos() {
+	combined_version_string
+	env_vars
+	shells
+}
+
+
+if [[ -x $(command -v uname) ]]; then
+	OS=$(uname -s)
+	if [[ "$OS" == "Darwin" ]]; then
+		versions_macos
+	elif [[ "$OS" == "Linux" ]]; then
+		versions_linux
+	else
+		log_error "Unsupported OS: '$OS'"
+	fi
+else
+	log_error "'uname' is not found, cannot detect OS"
+fi
