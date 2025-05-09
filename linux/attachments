@@ -134,4 +134,4 @@ log_info "${BLUE}SGID Binaries ${NC}"
 find / -user root -perm -6000 -exec ls -ldb {} \; 2>/dev/null
 
 log_info "${BLUE}Binaries with Capabilities"
-find /usr/bin /usr/sbin /usr/local/bin /usr/local/sbin -type f -exec getcap {} \;
+find /usr/bin /usr/sbin /usr/local/bin /usr/local/sbin -type f -exec getcap {} \; 2>/dev/null
