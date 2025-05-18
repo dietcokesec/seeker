@@ -1,6 +1,3 @@
-# Set progress preference to silently continue to avoid progress bars
-$ProgressPreference = 'SilentlyContinue'
-
 # Function to display section headers
 function Show-Header {
     param([string]$Title)
@@ -9,6 +6,20 @@ function Show-Header {
     Write-Host "$Title" -ForegroundColor Cyan
     Write-Host "$('-' * $Title.Length)" -ForegroundColor Cyan
 }
+
+# Function to capture and display command output in a controlled manner
+function Get-CommandOutput {
+    param (
+        [string]$SectionName,
+        [scriptblock]$Command
+    )
+    
+    Show-Header $SectionName
+    & $Command
+    # Add a small delay to ensure output buffering completes
+    Start-Sleep -Milliseconds 100
+}
+
 
 # Main script
 Write-Host "Gathering system information" -ForegroundColor Green
@@ -115,4 +126,61 @@ foreach ($rule in $appLockerRules) {
         Write-Host "Action: $($rule.Action)" -ForegroundColor Red
     }
     Write-Host ""
+}
+
+# Environment Variables - Collect and format in a controlled way
+Get-CommandOutput "Environment Variables" {
+    Get-ChildItem Env: | Format-Table -AutoSize
+}
+
+# Running processes bound to ports - Process and display in a controlled manner
+Get-CommandOutput "Running Processes Bound to Ports" {
+    $processesWithPorts = netstat -ano
+    
+    # Get the names of each service by PID
+    $processNames = @()
+    foreach ($line in $processesWithPorts) {
+        if ($line -match "^\s*\S+\s+\S+\s+\S+\s+\S+\s+(\d+)") {
+            $processId = $matches[1]
+            $processName = (Get-Process -Id $processId -ErrorAction SilentlyContinue).ProcessName
+            if ($processName) {
+                $processNames += [PSCustomObject]@{
+                    PID = $processId
+                    ProcessName = $processName
+                }
+            }
+        }
+    }
+    
+    # Remove duplicates and display
+    $processNames | Sort-Object -Property ProcessName -Unique | Format-Table -AutoSize
+}
+
+# Get logged-in users
+Get-CommandOutput "Logged-in Users" {
+    query user
+}
+
+# User privileges
+Get-CommandOutput "User Privileges" {
+    whoami /priv
+}
+
+# All Groups
+Get-CommandOutput "All Groups" {
+    net localgroup
+}
+
+# Checking Patches and HotFixes
+Get-CommandOutput "Patches and HotFixes" {
+    Get-HotFix | Sort-Object -Property InstalledOn -Descending | Format-Table -AutoSize
+}
+
+# Installed products
+Get-CommandOutput "Installed Products" {
+    Get-WmiObject -Class Win32_Product | 
+        Where-Object { $_.Name -notlike "*Microsoft*" } | 
+        Select-Object Name, Version | 
+        Sort-Object -Property Name | 
+        Format-Table -AutoSize
 }
